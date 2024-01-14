@@ -1,0 +1,277 @@
+.env
+BOT_TOKEN="токен бота"
+ADMIN_ID=id разработчика
+MAIN_DIRECTORY_PATH="./sonya_bot"
+
+config.py
+from dotenv import load_dotenv
+import os
+
+dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
+
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
+
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+MAIN_DIR = os.environ["MAIN_DIRECTORY_PATH"]
+ADMIN_ID = os.environ["ADMIN_ID"]
+
+handlers.py
+from aiogram import types, F, Router
+from aiogram.types import Message
+from aiogram.filters import Command
+
+from aiogram import flags
+from aiogram.fsm.context import FSMContext
+from aiogram.types.callback_query import CallbackQuery
+from aiogram.types.input_file import FSInputFile
+from aiogram.methods.send_message import SendMessage
+
+import kb
+from states import General
+from text import texts
+from utils import _check_application, is_applicated, split_and_combaine_msg
+from config import MAIN_DIR, ADMIN_ID
+
+
+router = Router()
+
+
+@router.message(Command("start"))
+async def start_handler(msg: Message):
+    await msg.answer(texts["start"], reply_markup=kb.start)
+
+
+@router.callback_query(F.data == "to_main")
+async def to_main(cb: CallbackQuery, state: FSMContext):
+    await state.set_state(General.main)
+    await cb.message.delete()
+    await cb.message.answer(texts["to_main"], reply_markup=kb.start)
+
+
+@router.callback_query(F.data == "application")
+async def to_main(cb: CallbackQuery, state: FSMContext):
+    await state.set_state(General.application)
+    await cb.message.delete()
+    await cb.message.answer(texts["application"], reply_markup=kb.to_main)
+
+
+@router.callback_query(F.data == "schema")
+async def to_main(cb: CallbackQuery, state: FSMContext):
+    await state.set_state(General.schema)
+    await cb.message.delete()
+    await cb.message.answer(texts["schema"], reply_markup=kb.to_main)
+
+
+@router.callback_query(F.data == "about")
+async def to_main(cb: CallbackQuery, state: FSMContext):
+    await state.set_state(General.about)
+    await cb.message.delete()
+    await cb.message.answer(texts["about"], reply_markup=kb.to_main)
+
+
+@router.callback_query(F.data == "catalog")
+async def to_main(cb: CallbackQuery, state: FSMContext):
+    await state.set_state(General.catalog)
+    await cb.message.delete()
+    file = FSInputFile(f"{MAIN_DIR}/catalog.xlsx")
+    await cb.message.answer_document(
+        file, caption=texts["catalog"], reply_markup=kb.to_main
+    )
+
+
+@router.callback_query(F.data == "contacts")
+async def to_main(cb: CallbackQuery, state: FSMContext):
+    await state.set_state(General.contacts)
+    await cb.message.delete()
+    await cb.message.answer(texts["contacts"], reply_markup=kb.to_main)
+
+
+@router.callback_query(F.data == "app_confirm")
+async def to_main(cb: CallbackQuery, state: FSMContext):
+    await state.set_state(General.app_confirm)
+    out = split_and_combaine_msg(
+        cb.message.text, cb.message.chat.username, cb.message.chat.id
+    )
+    await cb.message.delete()
+    await cb.message.answer(texts["app_confirm"], reply_markup=kb.app_confirm)
+    return SendMessage(chat_id=ADMIN_ID, text=out)
+
+
+@router.callback_query(F.data == "close_time")
+async def to_main(cb: CallbackQuery, state: FSMContext):
+    await state.set_state(General.close_time)
+    await cb.message.delete()
+    await cb.message.answer(texts["close_time"], reply_markup=kb.to_main)
+
+
+@router.callback_query(F.data == "2_3_months")
+async def to_main(cb: CallbackQuery, state: FSMContext):
+    await state.set_state(General.monts)
+    await cb.message.delete()
+    await cb.message.answer(texts["contacts"], reply_markup=kb.to_main)
+
+
+@router.callback_query(F.data == "just_info")
+async def to_main(cb: CallbackQuery, state: FSMContext):
+    await state.set_state(General.catalog)
+    await cb.message.delete()
+    file = FSInputFile(f"{MAIN_DIR}/catalog.xlsx")
+    await cb.message.answer_document(
+        file, caption=texts["catalog"], reply_markup=kb.to_main
+    )
+
+
+@router.message(General.application)
+async def check_application(msg: Message):
+    if is_applicated(msg.text) == False:
+        await msg.answer(texts["bad_input"], reply_markup=kb.to_main)
+    else:
+        out = _check_application(msg.text)
+        await msg.answer(out, reply_markup=kb.check_application)
+
+kb.py
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
+
+_IKB = InlineKeyboardButton
+_IKM = InlineKeyboardMarkup
+
+_start = [
+    [
+        _IKB(text="Оставить заявку", callback_data="application"),
+    ],
+    [
+        _IKB(text="Схема поставки авто", callback_data="schema"),
+    ],
+    [
+        _IKB(text="О Компании", callback_data="about"),
+    ],
+    [
+        _IKB(text="Каталог авто", callback_data="catalog"),
+    ],
+    [
+        _IKB(text="Контакты", callback_data="contacts"),
+    ],
+]
+start = _IKM(inline_keyboard=_start)
+
+_check_application = [
+    [
+        _IKB(text="Подтвердить заявку", callback_data="app_confirm"),
+    ],
+    [
+        _IKB(text="<< В главное меню", callback_data="to_main"),
+    ],
+]
+check_application = _IKM(inline_keyboard=_check_application)
+
+_app_confirm = [
+    [
+        _IKB(text="В ближайшее время", callback_data="close_time"),
+    ],
+    [
+        _IKB(text="В течение 2-3 месяцев", callback_data="2_3_months"),
+    ],
+    [
+        _IKB(text="Просто узнаю информацию", callback_data="just_info"),
+    ],
+    [
+        _IKB(text="<< В главное меню", callback_data="to_main"),
+    ],
+]
+app_confirm = _IKM(inline_keyboard=_app_confirm)
+
+_to_main = [
+    [
+        _IKB(text="<< В главное меню", callback_data="to_main"),
+    ],
+]
+to_main = _IKM(inline_keyboard=_to_main)
+
+main.py
+from aiogram import Bot, Dispatcher
+from aiogram.enums.parse_mode import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
+import asyncio
+import logging
+
+
+from config import BOT_TOKEN, MAIN_DIR
+from handlers import router
+
+
+async def main():
+    bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
+    dp = Dispatcher(storage=MemoryStorage())
+    dp.include_router(router)
+
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(
+        bot,
+        allowed_updates=dp.resolve_used_update_types(),
+    )
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, filename=f"{MAIN_DIR}/logging.log")
+    asyncio.run(main())
+
+states.py
+from aiogram.fsm.state import StatesGroup, State
+
+
+class General(StatesGroup):
+    main = State()
+    application = State()
+    schema = State()
+    about = State()
+    application = State()
+    catalog = State()
+    contacts = State()
+    app_confirm = State()
+    close_time = State()
+    monts = State()
+    just_info = State()
+
+text.py
+from aiogram.utils.markdown import hlink
+
+texts = {
+    "start": f"Авто из ОАЭ, Кореи и Китая “под ключ” на 20-25% ниже российского рынка👌\n\nЛегально, официально (работаем по договору), абсолютно прозрачно🙌\n\n{hlink('Сайт', 'https://whaleauto.bitrix24site.ru/')}\n\n{hlink('Чат для вопросов', 'https://t.me/AUTO_Emirates_ru')}",
+    "about": "Наша компания Whale Auto оказывает услуги подбора, покупки, таможенной очистки и доставки автомобилей в Россию «под ключ», что позволяет получить цену на 15-20% ниже российского рынка. Работаем легально, прозрачно, официально (по договору).",
+    "schema": "Шаг1.Мы получаем от Вас задание на покупку автомобиля, в которым определяются параметры поиска (марка, сумма, технические характеристики, год и т.д.)\nШаг2.Мы делаем подборку автомобилей согласно Вашего задания с указанием аналогов, фото, цены, технических характеристик и т.д. Делаем полный прозрачный расчет всех платежей, Вам будет понятно из чего складывается окончательная цена вашего авто.\nШаг3.После того, как Вы определились с автомобилем, заключаем договор поставки авто для Вас. В него входит: доставка, тюнинг (по требованию), проведение необходимых консультаций и пояснений, расчёт таможенных платежей и прочих расходов.\nШаг4.Производится оплата наших услуг в размере 3000$. Возможна как частичная, так и полная оплата автомобиля (стоимость в ОАЭ). При полной оплате на стоимость не будет влиять дальнейшее изменение курса доллара.\nШаг5.Выезд нашего представителя в автосалон и бронирование автомобиля. Согласование с Вами в режиме реального времени конкретного автомобиля с отправкой фото, видео и пр. необходимого контента для совершения Вами выбора машины. Проверка технического состояния автомобиля нашим специалистом. Заключение договора купли-продажи авто с продавцом в ОАЭ, Китае или Кореи.\nШаг6.Заключение договора доставки с транспортной компанией Вашего автомобиля до порта назначения и его страхование.\nШаг7.Ваш автомобиль отправляется транспортной компанией на доставку.\nШаг8.После прибытия в порт назначения автомобиль проходит процесс таможенной очистки, и далее мы забираем автомобиль и производим его доставку до конечного пункта назначения.\nШаг9.Автомобиль доставляется в любой город России.",
+    "application": "Пришлите сообщение в следующим формате:\n\nМарка авто\nМодель ТС\nКомплектация ТС\nТип привода\nТип топлива\nПробег\nГод выпуска\nПредполагаемый бюджет",
+    "app_confirm": "Выберете планируемую дату покупки авто",
+    "close_time": "Свяжитесь с нами по телефну:\n89171500009 (Вадим)",
+    "contacts": f"{hlink('Сайт', 'https://whaleauto.bitrix24site.ru/')}\n{hlink('ВКонтакте', 'https://vk.com/avtoizoaekoreikitay')}\n{hlink('Telegram', 'https://t.me/avtoemirates')}\nТелефон: 89171500009 Вадим",
+    "catalog": "Выше представлен каталог транспортных средств:",
+    "bad_input": "Введенные данные не соответствуют указанному формату.\nВведите данные заново",
+    "to_main": "Что бы вы хотели узнать?",
+}
+
+utils.py
+def is_applicated(text: str):
+    lines = text.split("\n")
+    if len(lines) < 8:
+        return False
+    elif len(lines) > 8:
+        return False
+    return True
+
+
+def _check_application(text: str):
+    lines = text.split("\n")
+    out_str = f"Вы ввели следующие данные:\n\nМарка авто: {lines[0]}\nМодель ТС: {lines[1]}\nКомплектация ТС: {lines[2]}\nТип привода: {lines[3]}\nТип топлива: {lines[4]}\nПробег: {lines[5]}\nГод выпуск: {lines[6]}\nПредполагаемый бюджет: {lines[7]}\n\nЕсли Вы допустили ошибку, пришлите данные снова в таком же формате"
+    return out_str
+
+
+def split_and_combaine_msg(text: str, user_name: str, user_id: int):
+    text = text.replace("Вы ввели следующие данные:", "")
+    text = text.replace(
+        "Если Вы допустили ошибку, пришлите данные снова в таком же формате", ""
+    )
+    text = f"Пользователь @{user_name} ({user_id}) оставил заявку со следующим содержанием:{text}"
+    return text
